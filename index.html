@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0B7783">
+<meta name="theme-color" content="#C8475F">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,30 +15,37 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
 /* Layout: single centered column like a pharmacy dosing card — today's doses split OS/OD, a fixed dock with the 規劃 button; plan screen is a week ledger of seven day rows. */
+/* 蜜桃便條: peach paper, white rounded cards, WenKai headings. Light-only by design. */
 :root{
-  --bg:#EDF3F4; --surface:#FFFFFF; --sunk:#E1EBED; --ink:#0F2F38; --muted:#56707A; --line:#CCDCE0;
-  --accent:#0B7783; --accent-soft:#D3EBED; --on-accent:#FFFFFF;
-  --eyeL:#3552C4; --eyeL-soft:#E2E7FA; --eyeR:#A23A86; --eyeR-soft:#F6E2F0;
-  --done:#1E7F55; --done-soft:#D9F0E4; --warn:#AE4417; --warn-soft:#F7E2D8;
-  --scrim:rgba(10,30,36,.45);
+  --bg:#FBF3E6; --surface:#FFFCF6; --sunk:#F4E7D4; --ink:#3D2B1F; --muted:#86695A; --line:#EAD8C1; --card-line:#EAD8C1;
+  --accent:#B8621A; --accent-soft:#FBE5CB; --on-accent:#FFFFFF;
+  --eyeL:#2D6B8A; --eyeL-soft:#DCEDF3; --eyeR:#AD4458; --eyeR-soft:#F8DFE3;
+  --done:#4A8638; --done-soft:#E3F0D6; --warn:#B4442A; --warn-soft:#F8DDD2;
+  --scrim:rgba(61,43,31,.42);
+  --shadow:0 2px 0 #EAD8C1; --r:18px;
   --font:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --display:"Huninn","Noto Sans TC","PingFang TC",sans-serif;
   --num:"IBM Plex Sans Condensed","Noto Sans TC",system-ui,sans-serif;
+  color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0C181C; --surface:#13252A; --sunk:#0F1F23; --ink:#E2EEF0; --muted:#8EA7AE; --line:#24393F;
-  --accent:#3DB5BF; --accent-soft:#163A3F; --on-accent:#06262A;
-  --eyeL:#8EA2F2; --eyeL-soft:#1E2848; --eyeR:#E58CCB; --eyeR-soft:#3A1F33;
-  --done:#5CCB94; --done-soft:#153427; --warn:#F09A6E; --warn-soft:#3B2117;
-  --scrim:rgba(0,0,0,.6); color-scheme:dark;}}
-:root[data-theme="dark"]{
-  --bg:#0C181C; --surface:#13252A; --sunk:#0F1F23; --ink:#E2EEF0; --muted:#8EA7AE; --line:#24393F;
-  --accent:#3DB5BF; --accent-soft:#163A3F; --on-accent:#06262A;
-  --eyeL:#8EA2F2; --eyeL-soft:#1E2848; --eyeR:#E58CCB; --eyeR-soft:#3A1F33;
-  --done:#5CCB94; --done-soft:#153427; --warn:#F09A6E; --warn-soft:#3B2117;
-  --scrim:rgba(0,0,0,.6); color-scheme:dark;}
+:root{
+  --bg:#FFF0EA; --surface:#FFFFFF; --sunk:#FCE3DB; --ink:#4A2C33; --muted:#8C666E; --line:#F2D2CA; --card-line:transparent;
+  --accent:#C8475F; --accent-soft:#FCDCE2; --on-accent:#FFFFFF;
+  --eyeL:#4A63BE; --eyeL-soft:#E3E8FA; --eyeR:#8752B5; --eyeR-soft:#EEE2F8;
+  --done:#2F8F5E; --done-soft:#DBF2E5; --warn:#BF4A2E; --warn-soft:#FBE0D7;
+  --scrim:rgba(74,44,51,.42);
+  --shadow:0 4px 16px rgba(200,71,95,.12); --r:24px;
+  --display:"LXGW WenKai TC","Noto Sans TC",sans-serif;
+}
+.today-h,.eye-h b,.wk-label,.card-h h2,.empty-day h2,.sheet h2,.btn-plan,.brand,.bar-row h1{font-family:var(--display)}
+.dose,.card,.empty-day{border-radius:var(--r)!important;box-shadow:var(--shadow);border-color:var(--card-line)!important}
+.btn-plan,.add,.dose-state{border-radius:calc(var(--r) - 4px)!important}
+:root .L .dose,:root .R .dose{border-top-width:0;border-left:6px solid}
+:root .L .dose{border-left-color:var(--eyeL)!important}
+:root .R .dose{border-left-color:var(--eyeR)!important}
 
 *{box-sizing:border-box}
 html,body{background:var(--bg)}
