@@ -288,14 +288,14 @@ function seed(){
   const [mRed,mYel,mGrn,mBlu,mPur]=s.meds;
   const E=(m,eye,drops,time)=>({id:uid(),medId:m.id,eye,drops,time});
   const ws=monday(new Date()),today=key(new Date());
-  const a=[E(mBlu,'B',1,'am'),E(mGrn,'R',1,'am'),E(mBlu,'B',1,'pm'),E(mYel,'L',2,'pm'),E(mRed,'B',1,'bed'),E(mPur,'R',1,'bed')];
+  const a=[E(mBlu,'B',1,'am'),E(mYel,'L',2,'pm'),E(mRed,'R',1,'bed')];
   s.weeks[key(ws)]=a;
   for(let i=0;i<7;i++){const k=key(addDays(ws,i));if(k>today)break;const lg={};
     a.forEach(e=>eyesOf(e).forEach(y=>{if(k<today){if(!(i===1&&e.time==='bed'))lg[e.id+':'+y]='已點'}else if(e.time==='am')lg[e.id+':'+y]='08:00'}));s.log[k]=lg}
   return s;
 }
 
-const SAMPLE_VER=2;
+const SAMPLE_VER=3;
 let S=migrate(load()||seed());
 if(S.sample&&S.sampleVer!==SAMPLE_VER)S=seed();
 save();
