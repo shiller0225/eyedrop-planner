@@ -63,8 +63,8 @@ button{cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-se
 #home{padding-block:20px 120px}
 .brand{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;letter-spacing:.12em;color:var(--accent)}
 .brand svg{width:16px;height:16px}
-.today-h{margin:10px 0 2px;font-size:38px;font-weight:700;line-height:1.2;text-wrap:balance}
-.today-h .wd{font-size:24px;font-weight:500;color:var(--muted);margin-left:6px}
+.today-h{margin:8px 0 2px;font-size:30px;font-weight:700;line-height:1.2;text-wrap:balance}
+.today-h .wd{font-size:22px;font-weight:500;color:var(--muted);margin-left:6px}
 .today-sub{color:var(--muted);font-size:17px}
 .progress{margin-top:14px;display:flex;align-items:center;gap:12px}
 .bar{flex:1;height:8px;border-radius:99px;background:var(--sunk);overflow:hidden}
@@ -178,6 +178,15 @@ button{cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-se
 .cell.miss{background:var(--warn-soft);color:var(--warn)}
 .cell.today{box-shadow:inset 0 0 0 2px var(--accent)}
 .week-actions:empty{display:none}
+/* ---------- People ---------- */
+.who-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--sunk);padding:5px;border-radius:99px}
+.who-tabs button{border:0;background:none;border-radius:99px;padding:10px 4px;font-family:var(--display);font-size:22px;font-weight:700;color:var(--muted);letter-spacing:.08em}
+.who-tabs button[aria-selected="true"]{background:var(--accent);color:var(--on-accent);box-shadow:0 2px 8px rgba(200,71,95,.25)}
+.who-name{margin:18px 0 0;font-family:var(--display);font-size:52px;line-height:1.1;font-weight:700;color:var(--accent);letter-spacing:.08em;text-wrap:balance}
+.plan-name{display:flex;flex-direction:column;align-items:center;line-height:1.1}
+.plan-name span{font-size:32px;color:var(--accent);letter-spacing:.06em}
+.plan-name small{font-family:var(--font);font-size:14px;color:var(--muted);font-weight:500;letter-spacing:.2em}
+.plan-tabs{margin-top:14px}
 /* ---------- Sheets ---------- */
 .sheet-wrap{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center}
 .scrim{position:absolute;inset:0;background:var(--scrim)}
@@ -249,6 +258,7 @@ const SLOTS=[['am','早上'],['pm','晚上'],['bed','睡前']];
 const SLOT_ORDER={am:0,pm:1,bed:2};
 const slotName=t=>({am:'早上',pm:'晚上',bed:'睡前'}[t]||'');
 const FIXED=[['紅色藥水','#D23B3B'],['黃色藥水','#F2C230'],['青眼露','#2E9A4E'],['安妥','#2F6FD6'],['康麗庚','#7B4FC4']];
+const PEOPLE=[['p1','石聿庭'],['p2','石又愷']];
 const RENAME={'紅色':'紅色藥水','黃色':'黃色藥水'};
 const fixedIdx=n=>{const i=FIXED.findIndex(f=>f[0]===n);return i<0?99:i};
 
@@ -265,7 +275,7 @@ const eyesOf=e=>e.eye==='B'?['L','R']:[e.eye];
 const nowHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
 const sig=e=>[e.medId,e.eye,e.drops,e.time].join('|');
 
-function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&Array.isArray(o.meds)&&(o.plans||o.weeks))return o}}catch(e){}return null}
+function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&Array.isArray(o.meds)&&(o.plans||o.weeks||o.people))return o}}catch(e){}return null}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 
 function migrate(o){
@@ -278,28 +288,31 @@ function migrate(o){
     const log={};Object.keys(o.log||{}).forEach(k=>{const l={};Object.keys(o.log[k]).forEach(dk=>{const p=dk.split(':');if(map[p[0]])l[map[p[0]]+':'+p[1]]=o.log[k][dk]});log[k]=l});
     o.weeks=weeks;o.log=log;delete o.plans;o.v=3;
   }
-  o.weeks=o.weeks||{};o.log=o.log||{};
+  if(o.v<4){o.people={p1:{weeks:o.weeks||{},log:o.log||{}},p2:{weeks:{},log:{}}};delete o.weeks;delete o.log;o.cur='p1';o.v=4}
+  o.people=o.people||{};PEOPLE.forEach(p=>{const x=o.people[p[0]]=o.people[p[0]]||{};x.name=p[1];x.weeks=x.weeks||{};x.log=x.log||{}});
+  if(!o.people[o.cur])o.cur='p1';
   o.meds.forEach(m=>{if(CAP_MAP[m.cap])m.cap=CAP_MAP[m.cap];if(!CAPS.some(c=>c[0]===m.cap))m.cap=CAPS[3][0]});
   o.meds.forEach(m=>{if(RENAME[m.name]&&!o.meds.find(x=>x.name===RENAME[m.name]))m.name=RENAME[m.name]});
   FIXED.forEach(f=>{const m=o.meds.find(x=>x.name===f[0]);if(m)m.cap=f[1];else o.meds.push({id:uid(),name:f[0],cap:f[1]})});
-  {const used=new Set();Object.values(o.weeks).forEach(a=>a.forEach(e=>used.add(e.medId)));o.meds=o.meds.filter(m=>used.has(m.id)||fixedIdx(m.name)<99)}
+  {const used=new Set();PEOPLE.forEach(p=>Object.values(o.people[p[0]].weeks).forEach(a=>a.forEach(e=>used.add(e.medId))));o.meds=o.meds.filter(m=>used.has(m.id)||fixedIdx(m.name)<99)}
   return o;
 }
 function seed(){
-  const s={v:3,meds:FIXED.map(f=>({id:uid(),name:f[0],cap:f[1]})),weeks:{},log:{},sample:true,sampleVer:SAMPLE_VER};
+  const s={v:4,meds:FIXED.map(f=>({id:uid(),name:f[0],cap:f[1]})),people:{},cur:'p1',sample:true,sampleVer:SAMPLE_VER};
   const [mRed,mYel,mGrn,mBlu,mPur]=s.meds;
   const E=(m,eye,drops,time)=>({id:uid(),medId:m.id,eye,drops,time});
   const ws=monday(new Date()),today=key(new Date());
-  const a=[E(mBlu,'B',1,'am'),E(mYel,'L',2,'pm'),E(mRed,'R',1,'bed')];
-  s.weeks[key(ws)]=a;
-  for(let i=0;i<7;i++){const k=key(addDays(ws,i));if(k>today)break;const lg={};
-    a.forEach(e=>eyesOf(e).forEach(y=>{if(k<today){if(!(i===1&&e.time==='bed'))lg[e.id+':'+y]='已點'}else if(e.time==='am')lg[e.id+':'+y]='08:00'}));s.log[k]=lg}
+  const plans={p1:[E(mBlu,'B',1,'am'),E(mYel,'L',2,'pm'),E(mRed,'R',1,'bed')],p2:[E(mGrn,'B',1,'am'),E(mPur,'L',1,'bed')]};
+  PEOPLE.forEach(([pid,name])=>{const a=plans[pid],log={};
+    for(let i=0;i<7;i++){const k=key(addDays(ws,i));if(k>today)break;const lg={};
+      a.forEach(e=>eyesOf(e).forEach(y=>{if(k<today){if(!(pid==='p1'&&i===1&&e.time==='bed'))lg[e.id+':'+y]='已點'}else if(e.time==='am')lg[e.id+':'+y]='08:00'}));log[k]=lg}
+    s.people[pid]={name,weeks:{[key(ws)]:a},log}});
   return s;
 }
 
-const SAMPLE_VER=3;
+const SAMPLE_VER=4;
 let S=migrate(load()||seed());
-(function prune(){const cut=key(addDays(new Date(),-400));Object.keys(S.log).forEach(k=>{if(k<cut)delete S.log[k]});Object.keys(S.weeks).forEach(k=>{if(k<cut)delete S.weeks[k]})})();
+(function prune(){const cut=key(addDays(new Date(),-400));Object.values(S.people).forEach(p=>{Object.keys(p.log).forEach(k=>{if(k<cut)delete p.log[k]});Object.keys(p.weeks).forEach(k=>{if(k<cut)delete p.weeks[k]})})})();
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}catch(e){}
 if(S.sample&&S.sampleVer!==SAMPLE_VER)S=seed();
 save();
@@ -307,13 +320,14 @@ let wk=monday(new Date());
 let ed=null,pendingConfirm=null;
 
 const $=id=>document.getElementById(id);
+const P=()=>S.people[S.cur];
 const med=id=>S.meds.find(m=>m.id===id)||{name:'(未命名)',cap:'#2F6FD6'};
 const byTime=(a,b)=>((SLOT_ORDER[a.time]??9)-(SLOT_ORDER[b.time]??9))||(fixedIdx(med(a.medId).name)-fixedIdx(med(b.medId).name));
-const weekList=w=>(S.weeks[w]||[]).slice().sort(byTime);
+const weekList=w=>(P().weeks[w]||[]).slice().sort(byTime);
 const dayList=k=>weekList(key(monday(parse(k))));
-function stats(k){let t=0,d=0;const lg=S.log[k]||{};dayList(k).forEach(e=>eyesOf(e).forEach(y=>{t++;if(lg[e.id+':'+y])d++}));return{t,d}}
+function stats(k){let t=0,d=0;const lg=P().log[k]||{};dayList(k).forEach(e=>eyesOf(e).forEach(y=>{t++;if(lg[e.id+':'+y])d++}));return{t,d}}
 function commit(){save();render()}
-function pruneMeds(){const used=new Set();Object.values(S.weeks).forEach(a=>a.forEach(e=>used.add(e.medId)));S.meds=S.meds.filter(m=>used.has(m.id)||fixedIdx(m.name)<99)}
+function pruneMeds(){const used=new Set();Object.values(S.people).forEach(p=>Object.values(p.weeks).forEach(a=>a.forEach(e=>used.add(e.medId))));S.meds=S.meds.filter(m=>used.has(m.id)||fixedIdx(m.name)<99)}
 const clone=a=>a.map(e=>Object.assign({},e,{id:uid()}));
 
 const ICON_DROP='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c-.4 0-.7.2-.9.5C9.4 5.6 5.5 10.9 5.5 14.6a6.5 6.5 0 0 0 13 0c0-3.7-3.9-9-5.6-11.6-.2-.3-.5-.5-.9-.5z"/></svg>';
@@ -321,10 +335,11 @@ const ICON_TICK='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" str
 const CHEV=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d?'M9 5l7 7-7 7':'M15 5l-7 7 7 7'}"/></svg>`;
 const capEl=c=>`<span class="cap" style="--cap:${esc(c)}"></span>`;
 
+function tabs(){return `<div class="who-tabs" role="tablist" aria-label="切換對象">${PEOPLE.map(([id,n])=>`<button role="tab" data-act="person" data-p="${id}" aria-selected="${S.cur===id}">${esc(n)}</button>`).join('')}</div>`}
 function banner(){return S.sample?`<div class="banner"><span>目前是<b>範例資料</b>，方便你先看看畫面。</span><button data-act="clear-sample">清除範例，開始規劃</button><button data-act="keep-sample">保留</button></div>`:''}
 
 function renderHome(){
-  const t=new Date(),k=key(t),list=dayList(k),lg=S.log[k]||{},st=stats(k),ws=monday(t);
+  const t=new Date(),k=key(t),list=dayList(k),lg=P().log[k]||{},st=stats(k),ws=monday(t);
   const col=y=>{
     const items=list.filter(e=>eyesOf(e).includes(y));
     const done=items.filter(e=>lg[e.id+':'+y]).length;
@@ -337,8 +352,9 @@ function renderHome(){
     return `<div class="eye-col ${y}"><div class="eye-h"><span class="eye-code">${EYE[y].c}</span><b>${EYE[y].t}</b><span class="cnt num">${done}/${items.length}</span></div>${cards||'<div class="eye-empty">今天不用點</div>'}</div>`;
   };
   $('home').innerHTML=`
-    <div class="brand">${ICON_DROP}眼藥水規劃器</div>
-    <h1 class="today-h" id="today-h">${t.getMonth()+1}月${t.getDate()}日<span class="wd">星期${WD[t.getDay()]}</span></h1>
+    ${tabs()}
+    <h1 class="who-name" id="today-h">${esc(P().name)}</h1>
+    <h2 class="today-h">${t.getMonth()+1}月${t.getDate()}日<span class="wd">星期${WD[t.getDay()]}</span></h2>
     <div class="today-sub num">${wkLabel(ws)}</div>
     ${st.t?`<div class="progress"><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${st.t}" aria-valuenow="${st.d}" aria-label="今日完成"><i style="width:${st.d/st.t*100}%"></i></div><span class="num">已點 ${st.d} / ${st.t}</span></div>`:''}
     ${banner()}
@@ -351,7 +367,7 @@ function renderPlan(){
   const ws=wk,w=key(ws),today=key(new Date()),thisMon=monday(new Date());
   const rel=Math.round((ws-thisMon)/6048e5);
   const tag=rel===0?'本週':rel===1?'下週':rel===-1?'上週':(rel>0?rel+' 週後':(-rel)+' 週前');
-  const list=weekList(w),prevW=key(addDays(ws,-7)),hasPrev=(S.weeks[prevW]||[]).length>0;
+  const list=weekList(w),prevW=key(addDays(ws,-7)),hasPrev=(P().weeks[prevW]||[]).length>0;
   const rows=list.map(e=>{const m=med(e.medId);
     return `<li><button class="entry" data-act="edit" data-id="${e.id}" aria-label="編輯 ${slotName(e.time)} ${esc(m.name)}"><span class="t">${slotName(e.time)}</span>${capEl(m.cap)}<span class="n">${esc(m.name)}</span><span class="eye-chip ${e.eye}">${EYE[e.eye].t}</span><span class="dr">${e.drops} 滴</span></button></li>`}).join('');
   let cells='';
@@ -360,12 +376,13 @@ function renderPlan(){
     cells+=`<div class="cell ${cls}${k===today?' today':''}"><span>${WD[d.getDay()]}</span><b class="num">${md(d)}</b><span class="st num">${txt}</span></div>`}
   $('plan').innerHTML=`
     <div class="plan-top"><div class="wrap">
-      <div class="bar-row"><button class="link-btn" data-act="go-home">‹ 今日</button><h1>規劃</h1><button class="link-btn r" data-act="this-week" ${rel===0?'style="visibility:hidden"':''}>回本週</button></div>
+      <div class="bar-row"><button class="link-btn" data-act="go-home">‹ 今日</button><h1 class="plan-name"><span>${esc(P().name)}</span><small>規劃</small></h1><button class="link-btn r" data-act="this-week" ${rel===0?'style="visibility:hidden"':''}>回本週</button></div>
       <div class="weeknav"><button class="wk-arrow" data-act="wk-prev" aria-label="上一週">${CHEV(0)}</button>
         <div class="wk"><div class="wk-label num">${wkLabel(ws)}</div><div class="wk-tag">${tag}</div></div>
         <button class="wk-arrow" data-act="wk-next" aria-label="下一週">${CHEV(1)}</button></div>
     </div></div>
     <div class="wrap">
+      <div class="plan-tabs">${tabs()}</div>
       ${banner()}
       <section class="card">
         <div class="card-h"><h2 class="wk-range num">${md(ws)}～${md(addDays(ws,6))}</h2><span>這週每天相同</span></div>
@@ -389,7 +406,7 @@ function render(){
 
 /* ---------- Editor ---------- */
 function openEditor(id){
-  const w=key(wk),e=id?(S.weeks[w]||[]).find(x=>x.id===id):null,m=e?med(e.medId):null;
+  const w=key(wk),e=id?(P().weeks[w]||[]).find(x=>x.id===id):null,m=e?med(e.medId):null;
   ed={w,id:e?e.id:null,name:m?m.name:'',cap:m?m.cap:CAPS[0][0],eye:e?e.eye:'B',drops:e?e.drops:1,time:e?e.time:'am',err:''};
   drawEditor();showSheet();
 }
@@ -397,7 +414,7 @@ function drawEditor(){
   const medChips=S.meds.slice().sort((a,b)=>fixedIdx(a.name)-fixedIdx(b.name)).map(m=>`<button type="button" class="chip" data-act="pick-med" data-id="${m.id}" aria-pressed="${m.name===ed.name}">${capEl(m.cap)}${esc(m.name)}</button>`).join('');
   $('sheet-body').innerHTML=`
     <h2 id="sheet-title">${ed.id?'編輯點藥':'新增點藥'}</h2>
-    <p class="sub num">${wkLabel(parse(ed.w))}　每天</p>
+    <p class="sub num">${esc(P().name)}・${wkLabel(parse(ed.w))}　每天</p>
     <div class="field"><span class="lbl">藥水品名</span><div class="chips meds">${medChips}</div></div>
     <div class="field"><span class="lbl">眼別</span><div class="seg">
       ${['L','R','B'].map(y=>`<button type="button" data-act="pick-eye" data-eye="${y}" aria-pressed="${ed.eye===y}">${EYE[y].t}<small>${EYE[y].c}</small></button>`).join('')}</div></div>
@@ -412,7 +429,7 @@ function drawEditor(){
 function saveEditor(){
   const m=S.meds.find(x=>x.name===ed.name);
   if(!m){ed.err='請選擇藥水品名。';drawEditor();return}
-  const arr=S.weeks[ed.w]=S.weeks[ed.w]||[];
+  const arr=P().weeks[ed.w]=P().weeks[ed.w]||[];
   if(ed.id)Object.assign(arr.find(x=>x.id===ed.id),{medId:m.id,eye:ed.eye,drops:ed.drops,time:ed.time});
   else arr.push({id:uid(),medId:m.id,eye:ed.eye,drops:ed.drops,time:ed.time});
   const wasEdit=!!ed.id;pruneMeds();hideSheet();commit();toast(wasEdit?'已更新':'已加入這週');
@@ -452,7 +469,7 @@ document.addEventListener('click',ev=>{
     case 'wk-prev':wk=addDays(wk,-7);renderPlan();break;
     case 'wk-next':wk=addDays(wk,7);renderPlan();break;
     case 'this-week':wk=monday(new Date());renderPlan();break;
-    case 'toggle':{const k=key(new Date()),lg=S.log[k]=S.log[k]||{},dk=b.dataset.k;
+    case 'toggle':{const k=key(new Date()),lg=P().log[k]=P().log[k]||{},dk=b.dataset.k;
       if(lg[dk])delete lg[dk];else lg[dk]=nowHM();commit();
       const nb=document.querySelector(`[data-k="${dk}"]`);if(nb)nb.focus();break}
     case 'add':openEditor(null);break;
@@ -463,26 +480,31 @@ document.addEventListener('click',ev=>{
     case 'pick-slot':ed.time=b.dataset.t;drawEditor();break;
     case 'pick-drops':ed.drops=Number(b.dataset.n);drawEditor();break;
     case 'save':saveEditor();break;
-    case 'del':{const w=ed.w,id=ed.id;S.weeks[w]=(S.weeks[w]||[]).filter(x=>x.id!==id);pruneMeds();hideSheet();commit();toast('已刪除');break}
+    case 'del':{const w=ed.w,id=ed.id;P().weeks[w]=(P().weeks[w]||[]).filter(x=>x.id!==id);pruneMeds();hideSheet();commit();toast('已刪除');break}
     case 'confirm-ok':{const fn=pendingConfirm;hideSheet();if(fn)fn();break}
-    case 'use-prev':S.weeks[key(wk)]=clone(S.weeks[key(addDays(wk,-7))]||[]);commit();toast('已沿用上週的規劃');break;
-    case 'copy-next':{const nx=addDays(wk,7),n=(S.weeks[key(nx)]||[]).length;
-      const run=()=>{S.weeks[key(nx)]=clone(S.weeks[key(wk)]||[]);wk=nx;commit();toast('已複製到下週')};
-      if(n)confirmSheet('複製到下週',`下${wkLabel(nx)}已有 ${n} 項規劃，複製後會被取代。`,'取代',run);else run();break}
-    case 'clear-week':confirmSheet('清空這週',`刪除${wkLabel(wk)}的規劃。`,'清空',()=>{delete S.weeks[key(wk)];pruneMeds();commit();toast('已清空')});break;
-    case 'clear-sample':S=migrate({v:3,meds:[],weeks:{},log:{},sample:false});commit();toast('已清除範例');break;
+    case 'use-prev':P().weeks[key(wk)]=clone(P().weeks[key(addDays(wk,-7))]||[]);commit();toast('已沿用上週的規劃');break;
+    case 'copy-next':{const nx=addDays(wk,7),n=(P().weeks[key(nx)]||[]).length;
+      const run=()=>{P().weeks[key(nx)]=clone(P().weeks[key(wk)]||[]);wk=nx;commit();toast('已複製到下週')};
+      if(n)confirmSheet('複製到下週',`${P().name}下${wkLabel(nx)}已有 ${n} 項規劃，複製後會被取代。`,'取代',run);else run();break}
+    case 'clear-week':confirmSheet('清空這週',`刪除${P().name}${wkLabel(wk)}的規劃。`,'清空',()=>{delete P().weeks[key(wk)];pruneMeds();commit();toast('已清空')});break;
+    case 'clear-sample':S=migrate({v:4,meds:[],people:{},cur:S.cur,sample:false});commit();toast('已清除範例');break;
+    case 'person':if(S.cur!==b.dataset.p){S.cur=b.dataset.p;commit();window.scrollTo(0,0)}break;
     case 'keep-sample':S.sample=false;commit();break;
     case 'backup':backupSheet();break;
     case 'copy-export':{const ta=$('f-export');const fb=()=>{ta.focus();ta.select();toast('已選取，請按「拷貝」')};
       try{navigator.clipboard.writeText(ta.value).then(()=>toast('已複製'),fb)}catch(e){fb()}break}
     case 'do-import':{const er=$('imp-err');try{const o=JSON.parse($('f-import').value.trim());
-      if(!o||!Array.isArray(o.meds)||!(o.plans||o.weeks))throw 0;
+      if(!o||!Array.isArray(o.meds)||!(o.plans||o.weeks||o.people))throw 0;
       o.sample=false;S=migrate(o);hideSheet();commit();toast('已還原備份')}
       catch(e){er.textContent='這段文字不是有效的備份碼，請確認是完整複製的內容。';er.hidden=false}break}
   }
 });
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!$('sheet').hidden)hideSheet()});
 window.addEventListener('hashchange',()=>{hideSheet();render();window.scrollTo(0,0)});
+let sx=null,sy=0;
+document.addEventListener('touchstart',e=>{if(!$('sheet').hidden||e.touches.length>1){sx=null;return}sx=e.touches[0].clientX;sy=e.touches[0].clientY},{passive:true});
+document.addEventListener('touchend',e=>{if(sx==null)return;const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;sx=null;
+  if(Math.abs(dx)>80&&Math.abs(dy)<50){const i=PEOPLE.findIndex(p=>p[0]===S.cur),j=i+(dx<0?1:-1);if(PEOPLE[j]){S.cur=PEOPLE[j][0];commit()}}},{passive:true});
 let shownDay=key(new Date());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){shownDay=key(new Date());render()}});
 setInterval(()=>{const k=key(new Date());if(k!==shownDay&&!document.hidden&&$('sheet').hidden){shownDay=k;render()}},60000);

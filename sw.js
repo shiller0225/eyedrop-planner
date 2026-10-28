@@ -1,6 +1,6 @@
 // 眼藥水規劃器 service worker
 // 頁面：先抓網路（3 秒逾時改用快取），確保更新能送到；圖示與字型：先用快取，省流量。
-const CACHE='eyedrop-v10';
+const CACHE='eyedrop-v11';
 const CORE=['./','./index.html','./manifest.webmanifest','./wenkai.woff2','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
