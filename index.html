@@ -158,7 +158,7 @@ button{cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-se
 .eye-chip.B{color:var(--accent);background:var(--accent-soft)}
 .entry .tick{width:16px;height:16px;color:var(--done)}
 .add{margin-top:6px;width:100%;border:1.5px dashed var(--line);background:none;border-radius:10px;padding:9px;color:var(--accent);font-weight:700;font-size:18px}
-.plan-foot{margin-top:24px;display:flex;justify-content:center}
+.plan-foot{margin-top:24px;display:flex;justify-content:center;flex-wrap:wrap;gap:10px}
 
 .card{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
 .card-h{display:flex;align-items:baseline;gap:4px 10px;flex-wrap:wrap}
@@ -178,6 +178,20 @@ button{cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-se
 .cell.miss{background:var(--warn-soft);color:var(--warn)}
 .cell.today{box-shadow:inset 0 0 0 2px var(--accent)}
 .week-actions:empty{display:none}
+/* ---------- Install ---------- */
+.install{margin-top:16px;display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);padding:12px 10px 12px 14px}
+.install-ico{flex:none;width:44px;height:44px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.install-ico svg{width:26px;height:26px}
+.install .txt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.install .txt b{font-size:18px}
+.install .txt span{font-size:15px;color:var(--muted)}
+.install .go{flex:none;border:0;background:var(--accent);color:var(--on-accent);border-radius:12px;padding:10px 14px;font-weight:700;font-size:17px;white-space:nowrap}
+.install .x{flex:none;border:0;background:none;color:var(--muted);font-size:16px;padding:8px 4px}
+.steps{margin:0;padding-left:1.5em;display:flex;flex-direction:column;gap:12px;font-size:19px;line-height:1.5}
+.steps li::marker{color:var(--accent);font-weight:700}
+.ico{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.2em;margin:0 .15em;color:var(--accent)}
+.url-box{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--sunk);border-radius:12px;padding:10px 12px}
+.url-box span{flex:1 1 220px;min-width:0;overflow-wrap:anywhere;font-size:15px;-webkit-user-select:all;user-select:all}
 /* ---------- People ---------- */
 .who-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--sunk);padding:5px;border-radius:99px}
 .who-tabs button{border:0;background:none;border-radius:99px;padding:10px 4px;font-family:var(--display);font-size:22px;font-weight:700;color:var(--muted);letter-spacing:.08em}
@@ -335,6 +349,56 @@ const ICON_TICK='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" str
 const CHEV=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d?'M9 5l7 7-7 7':'M15 5l-7 7 7 7'}"/></svg>`;
 const capEl=c=>`<span class="cap" style="--cap:${esc(c)}"></span>`;
 
+
+/* ---------- Install to home screen ---------- */
+const ICON_PHONE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3M10.5 18.5h3"/></svg>';
+const ICON_SHARE='<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="分享圖示"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v9h14v-9h-1"/></svg>';
+const ICON_DOTS='<svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-label="選單圖示"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+const APP_URL='https://shiller0225.github.io/eyedrop-planner/';
+const UA=navigator.userAgent||'';
+const isIOS=/iPhone|iPad|iPod/.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isAndroid=/Android/.test(UA);
+const inApp=/Line\/|FBAN|FBAV|FB_IAB|Instagram|MicroMessenger|GSA\/|KAKAOTALK|Twitter|; wv\)/i.test(UA);
+const inFrame=(()=>{try{return window.top!==window.self}catch(e){return true}})();
+const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}};
+let deferredPrompt=null,installHidden=false;
+try{installHidden=localStorage.getItem('eyedrop-install-hide')==='1'}catch(e){}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;if(location.hash!=='#plan')renderHome()});
+window.addEventListener('appinstalled',()=>{deferredPrompt=null;installHidden=true;render();toast('已安裝到主畫面')});
+const canOfferInstall=()=>!isStandalone()&&!inFrame;
+function installBar(){
+  if(!canOfferInstall()||installHidden)return'';
+  const sub=inApp?`目前在 App 內建瀏覽器，請改用 ${isIOS?'Safari':'Chrome'} 開啟後安裝`:'像一般 App 一樣，從主畫面一點就開';
+  return `<div class="install"><span class="install-ico">${ICON_PHONE}</span><div class="txt"><b>安裝到手機主畫面</b><span>${sub}</span></div>
+    <button class="go" data-act="install">${deferredPrompt?'安裝':'怎麼裝'}</button><button class="x" data-act="install-hide" aria-label="先不要">✕</button></div>`;
+}
+function installSheet(){
+  ed=null;let title='安裝到手機主畫面',intro='',steps=[],extra='';
+  const urlBox=`<div class="url-box"><span class="num">${APP_URL}</span><button type="button" class="btn" data-act="copy-url">複製網址</button></div>`;
+  if(inApp){
+    intro='你現在是在 LINE、Google 或其他 App 內建的瀏覽器裡，這裡沒有安裝功能。';
+    steps=isIOS?['點畫面右上角或右下角的「⋯」或'+ICON_SHARE+'分享',`選「以 Safari 開啟」或「用瀏覽器開啟」`,'在 Safari 打開後，再按一次 App 裡的「安裝到手機」']
+               :['點畫面右上角的'+ICON_DOTS,'選「用 Chrome 開啟」或「以瀏覽器開啟」','在 Chrome 打開後，再按一次 App 裡的「安裝到手機」'];
+    extra='<p class="help">也可以複製下面的網址，貼到 '+(isIOS?'Safari':'Chrome')+' 開啟：</p>'+urlBox;
+  }else if(isIOS){
+    const chrome=/CriOS/.test(UA),other=/FxiOS|EdgiOS|OPiOS/.test(UA);
+    if(other){intro='這個瀏覽器不一定能加入主畫面，建議改用 Safari 開啟。';steps=['複製下面的網址','打開 Safari，貼上網址開啟','點'+ICON_SHARE+'分享 →「加入主畫面」'];extra=urlBox}
+    else steps=chrome?['點網址列右邊的'+ICON_SHARE+'分享','往下找到「加入主畫面」','右上角按「新增」']
+                     :['點 Safari 下方（或網址列旁）的'+ICON_SHARE+'分享','往下滑，點「加入主畫面」','右上角按「新增」'];
+    if(!other)extra='<p class="help">完成後，主畫面會出現眼睛圖示的「眼藥水」。之後請從那個圖示開啟。</p>';
+  }else if(isAndroid){
+    steps=['點 Chrome 右上角的'+ICON_DOTS,'選「安裝應用程式」或「加到主畫面」','按「安裝」'];
+    extra='<p class="help">用三星瀏覽器的話：點下方「≡」→「新增頁面至」→「主畫面」。</p>';
+  }else{
+    steps=['在電腦版 Chrome，點網址列右側的安裝圖示','按「安裝」'];
+    extra='<p class="help">要裝在手機上，請用手機掃描 QR code 開啟這個網址。</p>'+urlBox;
+  }
+  $('sheet-body').innerHTML=`<h2 id="sheet-title">${title}</h2>${intro?`<p class="help">${intro}</p>`:''}
+    <ol class="steps">${steps.map(t=>`<li>${t}</li>`).join('')}</ol>${extra}
+    <div class="actions"><span class="grow"></span><button type="button" class="btn primary" data-act="close">知道了</button></div>`;
+  showSheet();
+}
+
 function tabs(){return `<div class="who-tabs" role="tablist" aria-label="切換對象">${PEOPLE.map(([id,n])=>`<button role="tab" data-act="person" data-p="${id}" aria-selected="${S.cur===id}">${esc(n)}</button>`).join('')}</div>`}
 function banner(){return S.sample?`<div class="banner"><span>目前是<b>範例資料</b>，方便你先看看畫面。</span><button data-act="clear-sample">清除範例，開始規劃</button><button data-act="keep-sample">保留</button></div>`:''}
 
@@ -357,6 +421,7 @@ function renderHome(){
     <h2 class="today-h">${t.getMonth()+1}月${t.getDate()}日<span class="wd">星期${WD[t.getDay()]}</span></h2>
     <div class="today-sub num">${wkLabel(ws)}</div>
     ${st.t?`<div class="progress"><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${st.t}" aria-valuenow="${st.d}" aria-label="今日完成"><i style="width:${st.d/st.t*100}%"></i></div><span class="num">已點 ${st.d} / ${st.t}</span></div>`:''}
+    ${installBar()}
     ${banner()}
     ${list.length?`<section class="eyes" aria-label="今日點藥">${col('L')}${col('R')}</section>
       <p class="note">同一眼點兩種以上藥水時，中間建議間隔約 5 分鐘。藥名、滴數與次數請依醫師或藥師指示。</p>`
@@ -394,7 +459,7 @@ function renderPlan(){
         <div class="card-h"><h2>這週點藥記錄</h2><span>依首頁打勾統計</span></div>
         <div class="strip">${cells}</div>
       </section>
-      <div class="plan-foot"><button class="chip-btn" data-act="backup">備份與還原</button></div>
+      <div class="plan-foot"><button class="chip-btn" data-act="backup">備份與還原</button>${canOfferInstall()?'<button class="chip-btn" data-act="install-help">安裝到手機</button>':''}</div>
     </div>`;
 }
 
@@ -491,6 +556,10 @@ document.addEventListener('click',ev=>{
     case 'person':if(S.cur!==b.dataset.p){S.cur=b.dataset.p;commit();window.scrollTo(0,0)}break;
     case 'keep-sample':S.sample=false;commit();break;
     case 'backup':backupSheet();break;
+    case 'install':if(deferredPrompt){const dp=deferredPrompt;deferredPrompt=null;dp.prompt();(dp.userChoice||Promise.resolve()).then(()=>render(),()=>render())}else installSheet();break;
+    case 'install-help':installSheet();break;
+    case 'install-hide':installHidden=true;try{localStorage.setItem('eyedrop-install-hide','1')}catch(e){}renderHome();toast('之後可在「規劃」頁最下方找到「安裝到手機」');break;
+    case 'copy-url':{const fb=()=>toast('請長按網址複製');try{navigator.clipboard.writeText(APP_URL).then(()=>toast('已複製網址'),fb)}catch(e){fb()}break}
     case 'copy-export':{const ta=$('f-export');const fb=()=>{ta.focus();ta.select();toast('已選取，請按「拷貝」')};
       try{navigator.clipboard.writeText(ta.value).then(()=>toast('已複製'),fb)}catch(e){fb()}break}
     case 'do-import':{const er=$('imp-err');try{const o=JSON.parse($('f-import').value.trim());
