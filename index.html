@@ -137,7 +137,7 @@ button{cursor:pointer}
 .day-h .spacer{flex:1}
 .mini{border:0;background:none;color:var(--accent);font-size:13px;font-weight:700;padding:6px 2px}
 .entries{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column}
-.entry{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:48px auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:10px 4px;border-top:1px solid var(--line)}
+.entry{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:10px 4px;border-top:1px solid var(--line)}
 .entry:focus-visible{outline:3px solid var(--accent);outline-offset:-2px;border-radius:8px}
 .entry .t{color:var(--muted);font-size:15px;font-weight:500}
 .entry .n{font-weight:500;overflow-wrap:anywhere}
@@ -151,6 +151,22 @@ button{cursor:pointer}
 .add{margin-top:6px;width:100%;border:1.5px dashed var(--line);background:none;border-radius:10px;padding:9px;color:var(--accent);font-weight:700;font-size:15px}
 .plan-foot{margin-top:24px;display:flex;justify-content:center}
 
+.card{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
+.card-h{display:flex;align-items:baseline;gap:4px 10px;flex-wrap:wrap}
+.card-h h2{margin:0;font-size:18px}
+.card-h span{color:var(--muted);font-size:13px}
+.card-empty{margin:12px 0 10px}
+.slot-h{margin-top:14px;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.12em}
+.slot-h+.entries{margin-top:2px}
+.card .add{margin-top:12px}
+.strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:12px}
+.cell{display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 0;border-radius:10px;background:var(--sunk);color:var(--muted);font-size:12px;min-width:0}
+.cell b{font-size:13px;color:var(--ink);font-weight:600}
+.cell .st{font-weight:700;font-size:12px;white-space:nowrap}
+.cell.ok{background:var(--done-soft);color:var(--done)}
+.cell.miss{background:var(--warn-soft);color:var(--warn)}
+.cell.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.week-actions:empty{display:none}
 /* ---------- Sheets ---------- */
 .sheet-wrap{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center}
 .scrim{position:absolute;inset:0;background:var(--scrim)}
@@ -229,52 +245,59 @@ const parse=k=>{const a=k.split('-').map(Number);return new Date(a[0],a[1]-1,a[2
 const addDays=(d,n)=>{const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()+n);return x};
 const monday=d=>addDays(d,-((d.getDay()+6)%7));
 const md=d=>pad(d.getMonth()+1)+'/'+pad(d.getDate());
+const wkLabel=ws=>'週（'+md(ws)+'～'+md(addDays(ws,6))+'）';
 const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const eyesOf=e=>e.eye==='B'?['L','R']:[e.eye];
 const nowHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
-const byTime=(a,b)=>((SLOT_ORDER[a.time]??9)-(SLOT_ORDER[b.time]??9))||(fixedIdx(med(a.medId).name)-fixedIdx(med(b.medId).name));
+const sig=e=>[e.medId,e.eye,e.drops,e.time].join('|');
 
-function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&o.plans&&Array.isArray(o.meds))return o}}catch(e){}return null}
+function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&Array.isArray(o.meds)&&(o.plans||o.weeks))return o}}catch(e){}return null}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 
 function migrate(o){
-  if(o.v!==2){Object.values(o.plans).forEach(a=>a.forEach(e=>{const t=e.time||'';
-    e.time=SLOT_ORDER[t]!=null?t:(!t||t<'12:00')?'am':t<'21:30'?'pm':'bed';if(e.drops>2)e.drops=2;if(e.drops<1)e.drops=1}));o.v=2}
+  if(!o.v||o.v<2){Object.values(o.plans||{}).forEach(a=>a.forEach(e=>{const t=e.time||'';
+    e.time=SLOT_ORDER[t]!=null?t:(!t||t<'12:00')?'am':t<'21:30'?'pm':'bed';e.drops=e.drops>=2?2:1}));o.v=2}
+  if(o.v<3){
+    const weeks={},map={};
+    Object.keys(o.plans||{}).sort().forEach(k=>{const w=key(monday(parse(k))),arr=weeks[w]=weeks[w]||[];
+      (o.plans[k]||[]).forEach(e=>{let t=arr.find(x=>sig(x)===sig(e));if(!t){t={id:uid(),medId:e.medId,eye:e.eye,drops:e.drops,time:e.time};arr.push(t)}map[e.id]=t.id})});
+    const log={};Object.keys(o.log||{}).forEach(k=>{const l={};Object.keys(o.log[k]).forEach(dk=>{const p=dk.split(':');if(map[p[0]])l[map[p[0]]+':'+p[1]]=o.log[k][dk]});log[k]=l});
+    o.weeks=weeks;o.log=log;delete o.plans;o.v=3;
+  }
+  o.weeks=o.weeks||{};o.log=o.log||{};
   FIXED.forEach(f=>{if(!o.meds.find(m=>m.name===f[0]))o.meds.push({id:uid(),name:f[0],cap:f[1]})});
   return o;
 }
 function seed(){
-  const s={v:2,meds:FIXED.map(f=>({id:uid(),name:f[0],cap:f[1]})),plans:{},log:{},sample:true};
+  const s={v:3,meds:FIXED.map(f=>({id:uid(),name:f[0],cap:f[1]})),weeks:{},log:{},sample:true};
   const [m1,m2,m3,m4]=s.meds;
   const E=(m,eye,drops,time)=>({id:uid(),medId:m.id,eye,drops,time});
   const ws=monday(new Date()),today=key(new Date());
-  for(let i=0;i<7;i++){
-    const k=key(addDays(ws,i)),a=[E(m1,'B',1,'am'),E(m2,'R',1,'am'),E(m1,'B',1,'pm')];
-    if(i<4)a.push(E(m3,'L',2,'pm'));
-    a.push(E(m4,'B',1,'bed'));
-    s.plans[k]=a;
-    if(k<=today){const lg={};a.forEach(e=>eyesOf(e).forEach(y=>{
-      if(k<today){if(!(i===1&&e.time==='bed'))lg[e.id+':'+y]='已點'}
-      else if(e.time==='am')lg[e.id+':'+y]='08:00';}));s.log[k]=lg}
-  }
+  const a=[E(m1,'B',1,'am'),E(m2,'R',1,'am'),E(m1,'B',1,'pm'),E(m3,'L',2,'pm'),E(m4,'B',1,'bed')];
+  s.weeks[key(ws)]=a;
+  for(let i=0;i<7;i++){const k=key(addDays(ws,i));if(k>today)break;const lg={};
+    a.forEach(e=>eyesOf(e).forEach(y=>{if(k<today){if(!(i===1&&e.time==='bed'))lg[e.id+':'+y]='已點'}else if(e.time==='am')lg[e.id+':'+y]='08:00'}));s.log[k]=lg}
   return s;
 }
 
 let S=migrate(load()||seed());
+save();
 let wk=monday(new Date());
-let ed=null;           // editor state
-let pendingConfirm=null;
+let ed=null,pendingConfirm=null;
 
 const $=id=>document.getElementById(id);
 const med=id=>S.meds.find(m=>m.id===id)||{name:'(未命名)',cap:'#8A9196'};
-const dayList=k=>(S.plans[k]||[]).slice().sort(byTime);
-function stats(k){let t=0,d=0;const lg=S.log[k]||{};(S.plans[k]||[]).forEach(e=>eyesOf(e).forEach(y=>{t++;if(lg[e.id+':'+y])d++}));return{t,d}}
+const byTime=(a,b)=>((SLOT_ORDER[a.time]??9)-(SLOT_ORDER[b.time]??9))||(fixedIdx(med(a.medId).name)-fixedIdx(med(b.medId).name));
+const weekList=w=>(S.weeks[w]||[]).slice().sort(byTime);
+const dayList=k=>weekList(key(monday(parse(k))));
+function stats(k){let t=0,d=0;const lg=S.log[k]||{};dayList(k).forEach(e=>eyesOf(e).forEach(y=>{t++;if(lg[e.id+':'+y])d++}));return{t,d}}
 function commit(){save();render()}
-function pruneMeds(){const used=new Set();Object.values(S.plans).forEach(a=>a.forEach(e=>used.add(e.medId)));S.meds=S.meds.filter(m=>used.has(m.id)||fixedIdx(m.name)<99)}
+function pruneMeds(){const used=new Set();Object.values(S.weeks).forEach(a=>a.forEach(e=>used.add(e.medId)));S.meds=S.meds.filter(m=>used.has(m.id)||fixedIdx(m.name)<99)}
+const clone=a=>a.map(e=>Object.assign({},e,{id:uid()}));
 
 const ICON_DROP='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c-.4 0-.7.2-.9.5C9.4 5.6 5.5 10.9 5.5 14.6a6.5 6.5 0 0 0 13 0c0-3.7-3.9-9-5.6-11.6-.2-.3-.5-.5-.9-.5z"/></svg>';
-const ICON_TICK='<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const ICON_TICK='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const CHEV=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d?'M9 5l7 7-7 7':'M15 5l-7 7 7 7'}"/></svg>`;
 const capEl=c=>`<span class="cap" style="--cap:${esc(c)}"></span>`;
 
@@ -286,54 +309,55 @@ function renderHome(){
     const items=list.filter(e=>eyesOf(e).includes(y));
     const done=items.filter(e=>lg[e.id+':'+y]).length;
     const cards=items.map(e=>{const m=med(e.medId),dk=e.id+':'+y,dn=lg[dk];
-      return `<button class="dose" data-act="toggle" data-k="${dk}" aria-pressed="${!!dn}" aria-label="${esc(EYE[y].t)} ${esc(m.name)} ${e.drops} 滴 ${slotName(e.time)}，${dn?'已點':'尚未點'}">
+      return `<button class="dose" data-act="toggle" data-k="${dk}" aria-pressed="${!!dn}" aria-label="${EYE[y].t} ${esc(m.name)} ${e.drops} 滴 ${slotName(e.time)}，${dn?'已點':'尚未點'}">
         <span class="dose-name">${capEl(m.cap)}<span>${esc(m.name)}</span></span>
         <span class="dose-row"><span class="drops"><b>${e.drops}</b>滴</span><span class="dose-time">${slotName(e.time)}</span></span>
-        <span class="dose-state">${dn?ICON_TICK.replace('class="tick"','width="18" height="18"')+'<span class="num">'+dn+'</span> 已點':'<span class="ring"></span>點完按這裡'}</span>
+        <span class="dose-state">${dn?ICON_TICK+'<span class="num">'+esc(dn)+'</span> 已點':'<span class="ring"></span>點完按這裡'}</span>
       </button>`}).join('');
     return `<div class="eye-col ${y}"><div class="eye-h"><span class="eye-code">${EYE[y].c}</span><b>${EYE[y].t}</b><span class="cnt num">${done}/${items.length}</span></div>${cards||'<div class="eye-empty">今天不用點</div>'}</div>`;
   };
   $('home').innerHTML=`
     <div class="brand">${ICON_DROP}眼藥水規劃器</div>
     <h1 class="today-h" id="today-h">${t.getMonth()+1}月${t.getDate()}日<span class="wd">星期${WD[t.getDay()]}</span></h1>
-    <div class="today-sub">週（<span class="num">${md(ws)}～${md(addDays(ws,6))}</span>）</div>
+    <div class="today-sub num">${wkLabel(ws)}</div>
     ${st.t?`<div class="progress"><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${st.t}" aria-valuenow="${st.d}" aria-label="今日完成"><i style="width:${st.d/st.t*100}%"></i></div><span class="num">已點 ${st.d} / ${st.t}</span></div>`:''}
     ${banner()}
     ${list.length?`<section class="eyes" aria-label="今日點藥">${col('L')}${col('R')}</section>
       <p class="note">同一眼點兩種以上藥水時，中間建議間隔約 5 分鐘。藥名、滴數與次數請依醫師或藥師指示。</p>`
-    :`<div class="empty-day"><h2>今天沒有排定點眼藥水</h2><p>按下方「規劃」，替這一週排好每天要點的藥水。</p></div>`}`;
+    :`<div class="empty-day"><h2>這週還沒有規劃</h2><p>按下方「規劃」，排好這週每天要點的藥水。</p></div>`}`;
 }
 
 function renderPlan(){
-  const ws=wk,today=key(new Date()),thisWk=key(monday(new Date()))===key(ws);
-  const rel=Math.round((ws-monday(new Date()))/6048e5);
+  const ws=wk,w=key(ws),today=key(new Date()),thisMon=monday(new Date());
+  const rel=Math.round((ws-thisMon)/6048e5);
   const tag=rel===0?'本週':rel===1?'下週':rel===-1?'上週':(rel>0?rel+' 週後':(-rel)+' 週前');
-  let days='';
-  for(let i=0;i<7;i++){
-    const d=addDays(ws,i),k=key(d),list=dayList(k),st=stats(k),lg=S.log[k]||{};
-    let badge='';
-    if(st.t&&k<=today){badge=st.d===st.t?`<span class="badge ok">完成 ${st.d}/${st.t}</span>`:k<today?`<span class="badge miss">漏點 ${st.t-st.d}</span>`:`<span class="badge part">已點 ${st.d}/${st.t}</span>`}
-    const rows=list.map(e=>{const m=med(e.medId),done=eyesOf(e).every(y=>lg[e.id+':'+y]);
-      return `<li><button class="entry" data-act="edit" data-day="${k}" data-id="${e.id}" aria-label="編輯 ${esc(m.name)}">
-        <span class="t">${slotName(e.time)}</span>${capEl(m.cap)}<span class="n">${esc(m.name)}</span>
-        <span class="eye-chip ${e.eye}">${EYE[e.eye].t}</span><span class="dr">${e.drops} 滴${done&&k<=today?' '+ICON_TICK:''}</span></button></li>`}).join('');
-    days+=`<li class="day${k===today?' is-today':''}${k<today?' is-past':''}">
-      <div class="day-h"><span class="d-date">${md(d)}</span><span class="d-wd">週${WD[d.getDay()]}</span>${k===today?'<span class="d-today">今天</span>':''}${badge}<span class="spacer"></span>
-      ${list.length?`<button class="mini" data-act="fill-week" data-day="${k}">套用到整週</button>`:''}</div>
-      ${rows?`<ul class="entries">${rows}</ul>`:''}
-      <button class="add" data-act="add" data-day="${k}">＋ 新增點藥</button></li>`;
-  }
+  const list=weekList(w),prevW=key(addDays(ws,-7)),hasPrev=(S.weeks[prevW]||[]).length>0;
+  const groups=SLOTS.map(sl=>{const items=list.filter(e=>e.time===sl[0]);if(!items.length)return'';
+    return `<div class="slot-h">${sl[1]}</div><ul class="entries">${items.map(e=>{const m=med(e.medId);
+      return `<li><button class="entry" data-act="edit" data-id="${e.id}" aria-label="編輯 ${sl[1]} ${esc(m.name)}">${capEl(m.cap)}<span class="n">${esc(m.name)}</span><span class="eye-chip ${e.eye}">${EYE[e.eye].t}</span><span class="dr">${e.drops} 滴</span></button></li>`}).join('')}</ul>`}).join('');
+  let cells='';
+  for(let i=0;i<7;i++){const d=addDays(ws,i),k=key(d),st=stats(k);let cls='',txt='—';
+    if(st.t&&k<=today){if(st.d===st.t){cls='ok';txt='✓'}else if(k<today){cls='miss';txt='漏 '+(st.t-st.d)}else{txt=st.d+'/'+st.t}}
+    cells+=`<div class="cell ${cls}${k===today?' today':''}"><span>${WD[d.getDay()]}</span><b class="num">${md(d)}</b><span class="st num">${txt}</span></div>`}
   $('plan').innerHTML=`
     <div class="plan-top"><div class="wrap">
-      <div class="bar-row"><button class="link-btn" data-act="go-home">‹ 今日</button><h1>規劃</h1><button class="link-btn r" data-act="this-week" ${thisWk?'style="visibility:hidden"':''}>回本週</button></div>
+      <div class="bar-row"><button class="link-btn" data-act="go-home">‹ 今日</button><h1>規劃</h1><button class="link-btn r" data-act="this-week" ${rel===0?'style="visibility:hidden"':''}>回本週</button></div>
       <div class="weeknav"><button class="wk-arrow" data-act="wk-prev" aria-label="上一週">${CHEV(0)}</button>
-        <div class="wk"><div class="wk-label num">週（${md(ws)}～${md(addDays(ws,6))}）</div><div class="wk-tag">${tag}</div></div>
+        <div class="wk"><div class="wk-label num">${wkLabel(ws)}</div><div class="wk-tag">${tag}</div></div>
         <button class="wk-arrow" data-act="wk-next" aria-label="下一週">${CHEV(1)}</button></div>
     </div></div>
     <div class="wrap">
       ${banner()}
-      <div class="week-actions"><button class="chip-btn" data-act="copy-next">複製這週到下週</button><button class="chip-btn danger" data-act="clear-week">清空這週</button></div>
-      <ol class="days">${days}</ol>
+      <section class="card">
+        <div class="card-h"><h2>每天要點的藥</h2><span>這一週每天都照這份清單</span></div>
+        ${list.length?groups:`<p class="help card-empty">這週還沒有規劃。</p>${hasPrev?'<button class="chip-btn" data-act="use-prev">沿用上週的規劃</button>':''}`}
+        <button class="add" data-act="add">＋ 新增點藥</button>
+      </section>
+      <div class="week-actions">${list.length?'<button class="chip-btn" data-act="copy-next">複製到下週</button><button class="chip-btn danger" data-act="clear-week">清空這週</button>':''}</div>
+      <section class="card">
+        <div class="card-h"><h2>這週點藥記錄</h2><span>依首頁打勾統計</span></div>
+        <div class="strip">${cells}</div>
+      </section>
       <div class="plan-foot"><button class="chip-btn" data-act="backup">備份與還原</button></div>
     </div>`;
 }
@@ -345,19 +369,16 @@ function render(){
 }
 
 /* ---------- Editor ---------- */
-function openEditor(day,id){
-  const e=id?(S.plans[day]||[]).find(x=>x.id===id):null;
-  const m=e?med(e.medId):null;
-  ed={day,id:e?e.id:null,name:m?m.name:'',cap:m?m.cap:CAPS[0][0],eye:e?e.eye:'B',drops:e?e.drops:1,time:e?e.time:'am',days:new Set([day]),err:''};
+function openEditor(id){
+  const w=key(wk),e=id?(S.weeks[w]||[]).find(x=>x.id===id):null,m=e?med(e.medId):null;
+  ed={w,id:e?e.id:null,name:m?m.name:'',cap:m?m.cap:CAPS[0][0],eye:e?e.eye:'B',drops:e?e.drops:1,time:e?e.time:'am',err:''};
   drawEditor();showSheet();
 }
 function drawEditor(){
-  const d=parse(ed.day),ws=monday(d);
   const medChips=S.meds.slice().sort((a,b)=>fixedIdx(a.name)-fixedIdx(b.name)).map(m=>`<button type="button" class="chip" data-act="pick-med" data-id="${m.id}" aria-pressed="${m.name===ed.name}">${capEl(m.cap)}${esc(m.name)}</button>`).join('');
-  let dp='';for(let i=0;i<7;i++){const x=addDays(ws,i),k=key(x);dp+=`<button type="button" data-act="pick-day" data-day="${k}" aria-pressed="${ed.days.has(k)}"><span>${WD[x.getDay()]}</span><small>${md(x)}</small></button>`}
   $('sheet-body').innerHTML=`
     <h2 id="sheet-title">${ed.id?'編輯點藥':'新增點藥'}</h2>
-    <p class="sub">${md(d)} 週${WD[d.getDay()]}</p>
+    <p class="sub num">${wkLabel(parse(ed.w))}　每天</p>
     <div class="field"><span class="lbl">藥水品名</span><div class="chips meds">${medChips}</div></div>
     <div class="field"><span class="lbl">瓶蓋顏色（方便對照藥瓶）</span><div class="swatches">
       ${CAPS.map(c=>`<button type="button" class="sw" style="--cap:${c[0]}" data-act="pick-cap" data-cap="${c[0]}" aria-pressed="${c[0]===ed.cap}" aria-label="${c[1]}色"></button>`).join('')}</div></div>
@@ -367,23 +388,18 @@ function drawEditor(){
       ${SLOTS.map(t=>`<button type="button" data-act="pick-slot" data-t="${t[0]}" aria-pressed="${ed.time===t[0]}">${t[1]}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">滴數</span><div class="seg two">
       ${[1,2].map(n=>`<button type="button" data-act="pick-drops" data-n="${n}" aria-pressed="${ed.drops===n}">${n} 滴</button>`).join('')}</div></div>
-    ${ed.id?'':`<div class="field"><span class="lbl">套用到這週哪幾天</span><div class="daypick">${dp}</div>
-      <div class="chips"><button type="button" class="chip" data-act="days-all">每天</button><button type="button" class="chip" data-act="days-one">只有這天</button></div></div>`}
     ${ed.err?`<p class="err" role="alert">${esc(ed.err)}</p>`:''}
     <div class="actions">${ed.id?'<button type="button" class="btn danger" data-act="del">刪除</button>':''}<span class="grow"></span>
       <button type="button" class="btn" data-act="close">取消</button><button type="button" class="btn primary" data-act="save">儲存</button></div>`;
 }
-function syncInputs(){const n=$('f-name'),t=$('f-time');if(n)ed.name=n.value;if(t)ed.time=t.value}
 function saveEditor(){
-  syncInputs();
-  const name=ed.name.trim();
-  if(!name){ed.err='請選擇藥水品名。';drawEditor();return}
-  if(!ed.id&&!ed.days.size){ed.err='請至少選一天。';drawEditor();return}
-  let m=S.meds.find(x=>x.name===name);
-  if(m)m.cap=ed.cap;else{if(fixedIdx(name)===99&&!ed.id){ed.err='請選擇藥水品名。';drawEditor();return}m={id:uid(),name,cap:ed.cap};S.meds.push(m)}
-  if(ed.id){const e=(S.plans[ed.day]||[]).find(x=>x.id===ed.id);Object.assign(e,{medId:m.id,eye:ed.eye,drops:ed.drops,time:ed.time})}
-  else ed.days.forEach(k=>{(S.plans[k]=S.plans[k]||[]).push({id:uid(),medId:m.id,eye:ed.eye,drops:ed.drops,time:ed.time})});
-  const n=ed.id?1:ed.days.size;pruneMeds();hideSheet();commit();toast(ed.id?'已更新':'已加入 '+n+' 天');
+  const m=S.meds.find(x=>x.name===ed.name);
+  if(!m){ed.err='請選擇藥水品名。';drawEditor();return}
+  m.cap=ed.cap;
+  const arr=S.weeks[ed.w]=S.weeks[ed.w]||[];
+  if(ed.id)Object.assign(arr.find(x=>x.id===ed.id),{medId:m.id,eye:ed.eye,drops:ed.drops,time:ed.time});
+  else arr.push({id:uid(),medId:m.id,eye:ed.eye,drops:ed.drops,time:ed.time});
+  const wasEdit=!!ed.id;pruneMeds();hideSheet();commit();toast(wasEdit?'已更新':'已加入這週');
 }
 
 /* ---------- Sheets / toast ---------- */
@@ -413,7 +429,7 @@ let tt;function toast(s){const t=$('toast');t.textContent=s;t.hidden=false;clear
 /* ---------- Events ---------- */
 document.addEventListener('click',ev=>{
   const b=ev.target.closest('[data-act]');if(!b)return;
-  const a=b.dataset.act,day=b.dataset.day;
+  const a=b.dataset.act;
   switch(a){
     case 'go-plan':wk=monday(new Date());location.hash='plan';break;
     case 'go-home':location.hash='';break;
@@ -423,41 +439,34 @@ document.addEventListener('click',ev=>{
     case 'toggle':{const k=key(new Date()),lg=S.log[k]=S.log[k]||{},dk=b.dataset.k;
       if(lg[dk])delete lg[dk];else lg[dk]=nowHM();commit();
       const nb=document.querySelector(`[data-k="${dk}"]`);if(nb)nb.focus();break}
-    case 'add':openEditor(day,null);break;
-    case 'edit':openEditor(day,b.dataset.id);break;
+    case 'add':openEditor(null);break;
+    case 'edit':openEditor(b.dataset.id);break;
     case 'close':hideSheet();break;
     case 'pick-med':{const m=S.meds.find(x=>x.id===b.dataset.id);ed.name=m.name;ed.cap=m.cap}ed.err='';drawEditor();break;
-    case 'pick-cap':syncInputs();ed.cap=b.dataset.cap;drawEditor();break;
-    case 'pick-eye':syncInputs();ed.eye=b.dataset.eye;drawEditor();break;
-    case 'pick-drops':ed.drops=Number(b.dataset.n);drawEditor();break;
+    case 'pick-cap':ed.cap=b.dataset.cap;drawEditor();break;
+    case 'pick-eye':ed.eye=b.dataset.eye;drawEditor();break;
     case 'pick-slot':ed.time=b.dataset.t;drawEditor();break;
-    case 'pick-day':syncInputs();ed.days.has(day)?ed.days.delete(day):ed.days.add(day);ed.err='';drawEditor();break;
-    case 'days-all':syncInputs();{const ws=monday(parse(ed.day));for(let i=0;i<7;i++)ed.days.add(key(addDays(ws,i)))}ed.err='';drawEditor();break;
-    case 'days-one':syncInputs();ed.days=new Set([ed.day]);drawEditor();break;
+    case 'pick-drops':ed.drops=Number(b.dataset.n);drawEditor();break;
     case 'save':saveEditor();break;
-    case 'del':{const d0=ed.day,id=ed.id;S.plans[d0]=(S.plans[d0]||[]).filter(x=>x.id!==id);pruneMeds();hideSheet();commit();toast('已刪除');break}
+    case 'del':{const w=ed.w,id=ed.id;S.weeks[w]=(S.weeks[w]||[]).filter(x=>x.id!==id);pruneMeds();hideSheet();commit();toast('已刪除');break}
     case 'confirm-ok':{const fn=pendingConfirm;hideSheet();if(fn)fn();break}
-    case 'fill-week':{const src=S.plans[day]||[],ws=monday(parse(day));
-      confirmSheet('套用到整週',`把 ${md(parse(day))} 的 ${src.length} 項點藥，套用到這週其他 6 天。其他天原本的規劃會被取代。`,'套用',()=>{
-        for(let i=0;i<7;i++){const k=key(addDays(ws,i));if(k!==day)S.plans[k]=src.map(e=>Object.assign({},e,{id:uid()}))}pruneMeds();commit();toast('已套用到整週')});break}
-    case 'copy-next':{const nx=addDays(wk,7);let n=0;for(let i=0;i<7;i++)n+=(S.plans[key(addDays(nx,i))]||[]).length;
-      const run=()=>{for(let i=0;i<7;i++){S.plans[key(addDays(nx,i))]=(S.plans[key(addDays(wk,i))]||[]).map(e=>Object.assign({},e,{id:uid()}))}wk=nx;pruneMeds();commit();toast('已複製到下週')};
-      if(n)confirmSheet('複製到下週',`下週（${md(nx)}～${md(addDays(nx,6))}）已有 ${n} 項規劃，複製後會被取代。`,'取代',run);else run();break}
-    case 'clear-week':confirmSheet('清空這週',`刪除 ${md(wk)}～${md(addDays(wk,6))} 的所有規劃。`,'清空',()=>{for(let i=0;i<7;i++)delete S.plans[key(addDays(wk,i))];pruneMeds();commit();toast('已清空')});break;
-    case 'clear-sample':S={v:1,meds:[],plans:{},log:{},sample:false};commit();toast('已清除範例');break;
+    case 'use-prev':S.weeks[key(wk)]=clone(S.weeks[key(addDays(wk,-7))]||[]);commit();toast('已沿用上週的規劃');break;
+    case 'copy-next':{const nx=addDays(wk,7),n=(S.weeks[key(nx)]||[]).length;
+      const run=()=>{S.weeks[key(nx)]=clone(S.weeks[key(wk)]||[]);wk=nx;commit();toast('已複製到下週')};
+      if(n)confirmSheet('複製到下週',`下${wkLabel(nx)}已有 ${n} 項規劃，複製後會被取代。`,'取代',run);else run();break}
+    case 'clear-week':confirmSheet('清空這週',`刪除${wkLabel(wk)}的規劃。`,'清空',()=>{delete S.weeks[key(wk)];pruneMeds();commit();toast('已清空')});break;
+    case 'clear-sample':S=migrate({v:3,meds:[],weeks:{},log:{},sample:false});commit();toast('已清除範例');break;
     case 'keep-sample':S.sample=false;commit();break;
     case 'backup':backupSheet();break;
-    case 'copy-export':{const ta=$('f-export');const done=()=>toast('已複製');
-      const fb=()=>{ta.focus();ta.select();toast('已選取，請按「拷貝」')};
-      try{navigator.clipboard.writeText(ta.value).then(done,fb)}catch(e){fb()}break}
+    case 'copy-export':{const ta=$('f-export');const fb=()=>{ta.focus();ta.select();toast('已選取，請按「拷貝」')};
+      try{navigator.clipboard.writeText(ta.value).then(()=>toast('已複製'),fb)}catch(e){fb()}break}
     case 'do-import':{const er=$('imp-err');try{const o=JSON.parse($('f-import').value.trim());
-      if(!o||typeof o.plans!=='object'||!Array.isArray(o.meds))throw 0;
-      S={v:1,meds:o.meds,plans:o.plans,log:o.log||{},sample:false};hideSheet();commit();toast('已還原備份')}
+      if(!o||!Array.isArray(o.meds)||!(o.plans||o.weeks))throw 0;
+      o.sample=false;S=migrate(o);hideSheet();commit();toast('已還原備份')}
       catch(e){er.textContent='這段文字不是有效的備份碼，請確認是完整複製的內容。';er.hidden=false}break}
   }
 });
-document.addEventListener('input',ev=>{if(ev.target.id==='f-time'&&ed){ed.time=ev.target.value;document.querySelectorAll('[data-act="pick-time"]').forEach(c=>c.setAttribute('aria-pressed',c.dataset.t===ed.time))}});
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!$('sheet').hidden)hideSheet();if(ev.key==='Enter'&&ev.target.id==='f-name'){ev.preventDefault();saveEditor()}});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!$('sheet').hidden)hideSheet()});
 window.addEventListener('hashchange',()=>{hideSheet();render();window.scrollTo(0,0)});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 render();
