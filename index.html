@@ -137,7 +137,7 @@ button{cursor:pointer}
 .day-h .spacer{flex:1}
 .mini{border:0;background:none;color:var(--accent);font-size:13px;font-weight:700;padding:6px 2px}
 .entries{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column}
-.entry{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:10px 4px;border-top:1px solid var(--line)}
+.entry{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:44px auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:10px 4px;border-top:1px solid var(--line)}
 .entry:focus-visible{outline:3px solid var(--accent);outline-offset:-2px;border-radius:8px}
 .entry .t{color:var(--muted);font-size:15px;font-weight:500}
 .entry .n{font-weight:500;overflow-wrap:anywhere}
@@ -154,6 +154,8 @@ button{cursor:pointer}
 .card{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
 .card-h{display:flex;align-items:baseline;gap:4px 10px;flex-wrap:wrap}
 .card-h h2{margin:0;font-size:18px}
+.card-h .wk-range{font-size:24px;font-weight:600}
+.card-h+.entries{margin-top:10px}
 .card-h span{color:var(--muted);font-size:13px}
 .card-empty{margin:12px 0 10px}
 .slot-h{margin-top:14px;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.12em}
@@ -244,7 +246,7 @@ const key=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const parse=k=>{const a=k.split('-').map(Number);return new Date(a[0],a[1]-1,a[2])};
 const addDays=(d,n)=>{const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()+n);return x};
 const monday=d=>addDays(d,-((d.getDay()+6)%7));
-const md=d=>pad(d.getMonth()+1)+'/'+pad(d.getDate());
+const md=d=>(d.getMonth()+1)+'/'+d.getDate();
 const wkLabel=ws=>'週（'+md(ws)+'～'+md(addDays(ws,6))+'）';
 const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -332,9 +334,8 @@ function renderPlan(){
   const rel=Math.round((ws-thisMon)/6048e5);
   const tag=rel===0?'本週':rel===1?'下週':rel===-1?'上週':(rel>0?rel+' 週後':(-rel)+' 週前');
   const list=weekList(w),prevW=key(addDays(ws,-7)),hasPrev=(S.weeks[prevW]||[]).length>0;
-  const groups=SLOTS.map(sl=>{const items=list.filter(e=>e.time===sl[0]);if(!items.length)return'';
-    return `<div class="slot-h">${sl[1]}</div><ul class="entries">${items.map(e=>{const m=med(e.medId);
-      return `<li><button class="entry" data-act="edit" data-id="${e.id}" aria-label="編輯 ${sl[1]} ${esc(m.name)}">${capEl(m.cap)}<span class="n">${esc(m.name)}</span><span class="eye-chip ${e.eye}">${EYE[e.eye].t}</span><span class="dr">${e.drops} 滴</span></button></li>`}).join('')}</ul>`}).join('');
+  const rows=list.map(e=>{const m=med(e.medId);
+    return `<li><button class="entry" data-act="edit" data-id="${e.id}" aria-label="編輯 ${slotName(e.time)} ${esc(m.name)}"><span class="t">${slotName(e.time)}</span>${capEl(m.cap)}<span class="n">${esc(m.name)}</span><span class="eye-chip ${e.eye}">${EYE[e.eye].t}</span><span class="dr">${e.drops} 滴</span></button></li>`}).join('');
   let cells='';
   for(let i=0;i<7;i++){const d=addDays(ws,i),k=key(d),st=stats(k);let cls='',txt='—';
     if(st.t&&k<=today){if(st.d===st.t){cls='ok';txt='✓'}else if(k<today){cls='miss';txt='漏 '+(st.t-st.d)}else{txt=st.d+'/'+st.t}}
@@ -349,8 +350,8 @@ function renderPlan(){
     <div class="wrap">
       ${banner()}
       <section class="card">
-        <div class="card-h"><h2>每天要點的藥</h2><span>這一週每天都照這份清單</span></div>
-        ${list.length?groups:`<p class="help card-empty">這週還沒有規劃。</p>${hasPrev?'<button class="chip-btn" data-act="use-prev">沿用上週的規劃</button>':''}`}
+        <div class="card-h"><h2 class="wk-range num">${md(ws)}～${md(addDays(ws,6))}</h2><span>這週每天相同</span></div>
+        ${list.length?`<ul class="entries">${rows}</ul>`:`<p class="help card-empty">這週還沒有規劃。</p>${hasPrev?'<button class="chip-btn" data-act="use-prev">沿用上週的規劃</button>':''}`}
         <button class="add" data-act="add">＋ 新增點藥</button>
       </section>
       <div class="week-actions">${list.length?'<button class="chip-btn" data-act="copy-next">複製到下週</button><button class="chip-btn danger" data-act="clear-week">清空這週</button>':''}</div>
