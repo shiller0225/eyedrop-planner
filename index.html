@@ -246,7 +246,8 @@ const EYE={L:{t:'左眼',c:'OS'},R:{t:'右眼',c:'OD'},B:{t:'雙眼',c:'OU'}};
 const SLOTS=[['am','早上'],['pm','晚上'],['bed','睡前']];
 const SLOT_ORDER={am:0,pm:1,bed:2};
 const slotName=t=>({am:'早上',pm:'晚上',bed:'睡前'}[t]||'');
-const FIXED=[['安妥','#2E9A4E'],['貝特舒','#2F6FD6'],['黃色','#F2C230'],['紅色','#D23B3B']];
+const FIXED=[['紅色藥水','#D23B3B'],['黃色藥水','#F2C230'],['青眼露','#2E9A4E'],['安妥','#2F6FD6'],['康麗庚','#7B4FC4']];
+const RENAME={'紅色':'紅色藥水','黃色':'黃色藥水'};
 const fixedIdx=n=>{const i=FIXED.findIndex(f=>f[0]===n);return i<0?99:i};
 
 const pad=n=>String(n).padStart(2,'0');
@@ -277,15 +278,17 @@ function migrate(o){
   }
   o.weeks=o.weeks||{};o.log=o.log||{};
   o.meds.forEach(m=>{if(CAP_MAP[m.cap])m.cap=CAP_MAP[m.cap];if(!CAPS.some(c=>c[0]===m.cap))m.cap=CAPS[3][0]});
-  FIXED.forEach(f=>{if(!o.meds.find(m=>m.name===f[0]))o.meds.push({id:uid(),name:f[0],cap:f[1]})});
+  o.meds.forEach(m=>{if(RENAME[m.name]&&!o.meds.find(x=>x.name===RENAME[m.name]))m.name=RENAME[m.name]});
+  FIXED.forEach(f=>{const m=o.meds.find(x=>x.name===f[0]);if(m)m.cap=f[1];else o.meds.push({id:uid(),name:f[0],cap:f[1]})});
+  {const used=new Set();Object.values(o.weeks).forEach(a=>a.forEach(e=>used.add(e.medId)));o.meds=o.meds.filter(m=>used.has(m.id)||fixedIdx(m.name)<99)}
   return o;
 }
 function seed(){
   const s={v:3,meds:FIXED.map(f=>({id:uid(),name:f[0],cap:f[1]})),weeks:{},log:{},sample:true};
-  const [m1,m2,m3,m4]=s.meds;
+  const [mRed,mYel,mGrn,mBlu]=s.meds;
   const E=(m,eye,drops,time)=>({id:uid(),medId:m.id,eye,drops,time});
   const ws=monday(new Date()),today=key(new Date());
-  const a=[E(m1,'B',1,'am'),E(m2,'R',1,'am'),E(m1,'B',1,'pm'),E(m3,'L',2,'pm'),E(m4,'B',1,'bed')];
+  const a=[E(mBlu,'B',1,'am'),E(mGrn,'R',1,'am'),E(mBlu,'B',1,'pm'),E(mYel,'L',2,'pm'),E(mRed,'B',1,'bed')];
   s.weeks[key(ws)]=a;
   for(let i=0;i<7;i++){const k=key(addDays(ws,i));if(k>today)break;const lg={};
     a.forEach(e=>eyesOf(e).forEach(y=>{if(k<today){if(!(i===1&&e.time==='bed'))lg[e.id+':'+y]='已點'}else if(e.time==='am')lg[e.id+':'+y]='08:00'}));s.log[k]=lg}
@@ -390,8 +393,6 @@ function drawEditor(){
     <h2 id="sheet-title">${ed.id?'編輯點藥':'新增點藥'}</h2>
     <p class="sub num">${wkLabel(parse(ed.w))}　每天</p>
     <div class="field"><span class="lbl">藥水品名</span><div class="chips meds">${medChips}</div></div>
-    <div class="field"><span class="lbl">代表顏色</span><div class="swatches">
-      ${CAPS.map(c=>`<button type="button" class="sw" style="--cap:${c[0]}" data-act="pick-cap" data-cap="${c[0]}" aria-pressed="${c[0]===ed.cap}" aria-label="${c[1]}色"></button>`).join('')}</div></div>
     <div class="field"><span class="lbl">眼別</span><div class="seg">
       ${['L','R','B'].map(y=>`<button type="button" data-act="pick-eye" data-eye="${y}" aria-pressed="${ed.eye===y}">${EYE[y].t}<small>${EYE[y].c}</small></button>`).join('')}</div></div>
     <div class="field"><span class="lbl">時間</span><div class="seg">
@@ -405,7 +406,6 @@ function drawEditor(){
 function saveEditor(){
   const m=S.meds.find(x=>x.name===ed.name);
   if(!m){ed.err='請選擇藥水品名。';drawEditor();return}
-  m.cap=ed.cap;
   const arr=S.weeks[ed.w]=S.weeks[ed.w]||[];
   if(ed.id)Object.assign(arr.find(x=>x.id===ed.id),{medId:m.id,eye:ed.eye,drops:ed.drops,time:ed.time});
   else arr.push({id:uid(),medId:m.id,eye:ed.eye,drops:ed.drops,time:ed.time});
@@ -453,7 +453,6 @@ document.addEventListener('click',ev=>{
     case 'edit':openEditor(b.dataset.id);break;
     case 'close':hideSheet();break;
     case 'pick-med':{const m=S.meds.find(x=>x.id===b.dataset.id);ed.name=m.name;ed.cap=m.cap}ed.err='';drawEditor();break;
-    case 'pick-cap':ed.cap=b.dataset.cap;drawEditor();break;
     case 'pick-eye':ed.eye=b.dataset.eye;drawEditor();break;
     case 'pick-slot':ed.time=b.dataset.t;drawEditor();break;
     case 'pick-drops':ed.drops=Number(b.dataset.n);drawEditor();break;
