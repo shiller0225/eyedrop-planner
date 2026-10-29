@@ -193,7 +193,7 @@ button{cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-se
 .entry .t .ord{font-style:normal;margin-left:1px;color:var(--accent);font-weight:700}
 .entry.clash{background:var(--warn-soft);border-radius:10px}
 .clash-tag{grid-column:1/-1;font-size:14px;font-weight:700;color:var(--warn)}
-.chip.blocked{opacity:.38;text-decoration:line-through}
+.chip.blocked,.seg button.blocked{opacity:.38;text-decoration:line-through}
 .order-hint{margin:-4px 0 0;font-size:16px;color:var(--accent);font-weight:500;background:var(--accent-soft);border-radius:10px;padding:8px 12px}
 @media (max-width:400px){
   .entry{grid-template-columns:auto auto minmax(0,1fr) auto auto;gap:6px}
@@ -306,6 +306,9 @@ const RULE_LAST='安妥',RULE_FIRST=['黃色藥水','紅色藥水'],RULE_EXCL=[[
 const RULE_RANK={'黃色藥水':0,'紅色藥水':1,'青眼露':2,'康麗庚':3,'安妥':9};
 const ruleRank=n=>RULE_RANK[n]??5;
 const clashName=(a,b)=>RULE_EXCL.some(([x,y])=>(a===x&&b===y)||(a===y&&b===x));
+/* 兩筆是否點到同一隻眼睛（雙眼包含左、右眼） */
+const eyeOverlap=(p,q)=>p==='B'||q==='B'||p===q;
+const sharedEye=(p,q)=>p===q?EYE[p].t:p==='B'?EYE[q].t:EYE[p].t;
 
 const pad=n=>String(n).padStart(2,'0');
 const key=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -369,7 +372,7 @@ const med=id=>S.meds.find(m=>m.id===id)||{name:'(未命名)',cap:'#2F6FD6'};
 const byTime=(a,b)=>((SLOT_ORDER[a.time]??9)-(SLOT_ORDER[b.time]??9))||(ruleRank(med(a.medId).name)-ruleRank(med(b.medId).name))||(fixedIdx(med(a.medId).name)-fixedIdx(med(b.medId).name));
 /* 檢查：回傳某週清單中違反排斥規則的配對 */
 function weekClashes(arr){const out=[];SLOTS.forEach(([t])=>{const it=arr.filter(e=>e.time===t);
-  for(let i=0;i<it.length;i++)for(let j=i+1;j<it.length;j++){const a=med(it[i].medId).name,b=med(it[j].medId).name;if(clashName(a,b))out.push({time:t,a:it[i],b:it[j]})}});return out}
+  for(let i=0;i<it.length;i++)for(let j=i+1;j<it.length;j++){const a=med(it[i].medId).name,b=med(it[j].medId).name;if(clashName(a,b)&&eyeOverlap(it[i].eye,it[j].eye))out.push({time:t,a:it[i],b:it[j]})}});return out}
 let CLASH_IDS=new Set(),ALERTS=[];
 /* 每次開啟（與每次存檔）都執行：依規則排序並檢查衝突 */
 function enforceRules(){
@@ -377,7 +380,7 @@ function enforceRules(){
   PEOPLE.forEach(([pid,name])=>{const wk_=S.people[pid].weeks;
     Object.keys(wk_).forEach(w=>{const arr=wk_[w];const before=arr.map(e=>e.id).join();arr.sort(byTime);if(arr.map(e=>e.id).join()!==before)moved=true;
       weekClashes(arr).forEach(c=>{CLASH_IDS.add(c.a.id);CLASH_IDS.add(c.b.id);
-        if(w>=thisW)ALERTS.push({pid,name,w,time:c.time,a:med(c.a.medId).name,b:med(c.b.medId).name})})})});
+        if(w>=thisW)ALERTS.push({pid,name,w,time:c.time,eye:sharedEye(c.a.eye,c.b.eye),a:med(c.a.medId).name,b:med(c.b.medId).name})})})});
   return moved;
 }
 enforceRules();save();
@@ -445,13 +448,13 @@ function installSheet(){
 
 const CIRC=['①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
 function ruleStatus(){
-  if(ALERTS.length){const rows=ALERTS.slice(0,4).map(a=>`<li><b>${esc(a.name)}</b>・${md(parse(a.w))} 那週・${slotName(a.time)}：${esc(a.a)} 和 ${esc(a.b)} 不能同時段</li>`).join('');
+  if(ALERTS.length){const rows=ALERTS.slice(0,4).map(a=>`<li><b>${esc(a.name)}</b>・${md(parse(a.w))} 那週・${slotName(a.time)}：${esc(a.a)} 和 ${esc(a.b)} 都點在${a.eye}</li>`).join('');
     const f=ALERTS[0];
     return `<div class="rule-alert" role="alert"><b>規劃不符合點藥規則</b><ul>${rows}</ul><button data-act="fix-clash" data-p="${f.pid}" data-w="${f.w}">前往修正</button></div>`}
   return `<div class="rule-ok">${ICON_TICK}<span>已依點藥規則檢查並排序</span></div>`;
 }
 function rulesCard(){return `<section class="rules"><h3>點藥規則（同一時段）</h3><ol>
-  <li><b>安妥</b>一定排在最後一個點</li><li>先點<b>黃色藥水</b>，再點<b>紅色藥水</b></li><li><b>紅色藥水</b>、<b>黃色藥水</b>不能和<b>安妥</b>排在同一時段</li></ol>
+  <li><b>安妥</b>一定排在最後一個點</li><li>先點<b>黃色藥水</b>，再點<b>紅色藥水</b></li><li>同一時段，<b>紅色藥水</b>、<b>黃色藥水</b>不能和<b>安妥</b>點在同一隻眼睛（分別點左、右眼可以）</li></ol>
   <p>新增或修改時會自動檢查，清單也會自動依規則排序。</p></section>`}
 function tabs(){return `<div class="who-tabs" role="tablist" aria-label="切換對象">${PEOPLE.map(([id,n])=>`<button role="tab" data-act="person" data-p="${id}" aria-selected="${S.cur===id}">${esc(n)}</button>`).join('')}</div>`}
 function banner(){return S.sample?`<div class="banner"><span>目前是<b>範例資料</b>，方便你先看看畫面。</span><button data-act="clear-sample">清除範例，開始規劃</button><button data-act="keep-sample">保留</button></div>`:''}
@@ -532,22 +535,26 @@ function openEditor(id){
   ed={w,id:e?e.id:null,name:m?m.name:'',cap:m?m.cap:CAPS[0][0],eye:e?e.eye:'B',drops:e?e.drops:1,time:e?e.time:'am',err:''};
   drawEditor();showSheet();
 }
-function slotOthers(){return (P().weeks[ed.w]||[]).filter(x=>x.time===ed.time&&x.id!==ed.id).map(x=>med(x.medId).name)}
-function blockerFor(name){return slotOthers().find(o=>clashName(name,o))}
+function slotItems(){return (P().weeks[ed.w]||[]).filter(x=>x.time===ed.time&&x.id!==ed.id)}
+function slotOthers(){return slotItems().map(x=>med(x.medId).name)}
+/* 回傳會擋住 (name, eye) 的那一筆：同時段、互斥藥水、同一隻眼睛 */
+function blockerFor(name,eye=ed.eye){const x=slotItems().find(o=>clashName(name,med(o.medId).name)&&eyeOverlap(eye,o.eye));return x?{name:med(x.medId).name,eye:x.eye}:null}
+const okEyes=name=>['L','R','B'].filter(y=>!blockerFor(name,y));
 function drawEditor(){
   const others=slotOthers();
-  const medChips=S.meds.slice().sort((a,b)=>fixedIdx(a.name)-fixedIdx(b.name)).map(m=>{const bl=blockerFor(m.name);
-    return `<button type="button" class="chip${bl?' blocked':''}" data-act="pick-med" data-id="${m.id}" aria-pressed="${m.name===ed.name}" aria-disabled="${!!bl}"${bl?` title="${esc(slotName(ed.time))}已有${esc(bl)}"`:''}>${capEl(m.cap)}${esc(m.name)}</button>`}).join('');
+  const medChips=S.meds.slice().sort((a,b)=>fixedIdx(a.name)-fixedIdx(b.name)).map(m=>{const bl=okEyes(m.name).length?null:blockerFor(m.name,'B');
+    return `<button type="button" class="chip${bl?' blocked':''}" data-act="pick-med" data-id="${m.id}" aria-pressed="${m.name===ed.name}" aria-disabled="${!!bl}"${bl?` title="${esc(slotName(ed.time))}${EYE[bl.eye].t}已有${esc(bl.name)}"`:''}>${capEl(m.cap)}${esc(m.name)}</button>`}).join('');
   const sel=ed.name?blockerFor(ed.name):null;
   const order=others.concat(ed.name&&!sel?[ed.name]:[]).sort((a,b)=>ruleRank(a)-ruleRank(b)||fixedIdx(a)-fixedIdx(b));
-  const hint=sel?`<p class="err" role="alert">${esc(slotName(ed.time))}已經排了${esc(sel)}，${esc(ed.name)}不能和${esc(sel)}同時段。請改選其他時段或藥水。</p>`
+  const alt=sel?okEyes(ed.name).filter(y=>y!=='B').map(y=>EYE[y].t):[];
+  const hint=sel?`<p class="err" role="alert">${esc(slotName(ed.time))}的${esc(sel.name)}已經點${EYE[sel.eye].t}，${esc(ed.name)}不能和它點在同一隻眼睛。${alt.length?'可以改點'+alt.join('或')+'，或':'請'}改選其他時段。</p>`
     :order.length>1?`<p class="order-hint">${esc(slotName(ed.time))}點藥順序：${order.map((n,i)=>CIRC[i]+esc(n)).join(' → ')}</p>`:'';
   $('sheet-body').innerHTML=`
     <h2 id="sheet-title">${ed.id?'編輯點藥':'新增點藥'}</h2>
     <p class="sub num">${esc(P().name)}・${wkLabel(parse(ed.w))}　每天</p>
     <div class="field"><span class="lbl">藥水品名</span><div class="chips meds">${medChips}</div></div>
     <div class="field"><span class="lbl">眼別</span><div class="seg">
-      ${['L','R','B'].map(y=>`<button type="button" data-act="pick-eye" data-eye="${y}" aria-pressed="${ed.eye===y}">${EYE[y].t}<small>${EYE[y].c}</small></button>`).join('')}</div></div>
+      ${['L','R','B'].map(y=>{const no=ed.name&&blockerFor(ed.name,y);return `<button type="button" class="${no?'blocked':''}" data-act="pick-eye" data-eye="${y}" aria-pressed="${ed.eye===y}" aria-disabled="${!!no}">${EYE[y].t}<small>${EYE[y].c}</small></button>`}).join('')}</div></div>
     <div class="field"><span class="lbl">時間</span><div class="seg">
       ${SLOTS.map(t=>`<button type="button" data-act="pick-slot" data-t="${t[0]}" aria-pressed="${ed.time===t[0]}">${t[1]}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">滴數</span><div class="seg two">
@@ -608,9 +615,10 @@ document.addEventListener('click',ev=>{
     case 'edit':openEditor(b.dataset.id);break;
     case 'close':hideSheet();break;
     case 'pick-med':{const m=S.meds.find(x=>x.id===b.dataset.id),bl=blockerFor(m.name);
-      if(bl){toast(`${slotName(ed.time)}已有${bl}，不能再排${m.name}`);break}ed.name=m.name;ed.cap=m.cap}ed.err='';drawEditor();break;
+      if(bl){const ok=okEyes(m.name);if(ok.length){ed.eye=ok.includes('L')&&!ok.includes('R')?'L':ok.includes('R')&&!ok.includes('L')?'R':ok[0];ed.name=m.name;ed.cap=m.cap;ed.err='';drawEditor();toast(`已改為${EYE[ed.eye].t}，避開${EYE[bl.eye].t}的${bl.name}`);break}
+        toast(`${slotName(ed.time)}的${bl.name}已點雙眼，不能再排${m.name}`);break}ed.name=m.name;ed.cap=m.cap}ed.err='';drawEditor();break;
     case 'fix-clash':S.cur=b.dataset.p;wk=parse(b.dataset.w);save();location.hash='plan';break;
-    case 'pick-eye':ed.eye=b.dataset.eye;drawEditor();break;
+    case 'pick-eye':{const no=ed.name&&blockerFor(ed.name,b.dataset.eye);if(no){toast(`${slotName(ed.time)}${EYE[no.eye].t}已有${no.name}，${ed.name}不能點${EYE[b.dataset.eye].t}`);break}ed.eye=b.dataset.eye;drawEditor();break}
     case 'pick-slot':ed.time=b.dataset.t;drawEditor();break;
     case 'pick-drops':ed.drops=Number(b.dataset.n);drawEditor();break;
     case 'save':saveEditor();break;
